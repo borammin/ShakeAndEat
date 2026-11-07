@@ -1,0 +1,139 @@
+rules_version = '2';
+
+// Shake & Eat security rules.
+// Everything is denied unless a rule below allows it. Matches the plan in the Show & Tell 1 deck.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function groupPath(gid) {
+      return /databases/$(database)/documents/groups/$(gid);
+    }
+
+    function isMember(gid) {
+      return signedIn()
+        && exists(groupPath(gid))
+        && request.auth.uid in get(groupPath(gid)).data.memberUids;
+    }
+
+    function isGroupOwner(gid) {
+      return signedIn()
+        && exists(groupPath(gid))
+        && get(groupPath(gid)).data.ownerUid == request.auth.uid;
+    }
+
+    function isText(value, minLength, maxLength) {
+      return value is string && value.size() >= minLength && value.size() <= maxLength;
+    }
+
+    // A vote list may change only by adding or removing the caller's own uid, never twice.
+    function votesChangeOnlyBySelf(before, after) {
+      return after.size() == after.toSet().size()
+        && after.toSet().difference(before.toSet())
+             .union(before.toSet().difference(after.toSet()))
+             .hasOnly([request.auth.uid]);
+    }
+
+    // users/{uid}: one profile per account. Any signed-in user may read names; only you write yours.
+    match /users/{uid} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'createdAt'])
+        && request.resource.data.keys().hasAll(['displayName', 'email', 'createdAt'])
+        && isText(request.resource.data.displayName, 1, 50)
+        && request.resource.data.email is string
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName'])
+        && isText(request.resource.data.displayName, 1, 50);
+
+      allow delete: if false;
+    }
+
+    // groups/{gid}: the group id is the invite code (six upper-case letters or digits).
+    match /groups/{gid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.memberUids;
+
+      allow create: if signedIn()
+        && gid.matches('[A-Z0-9]{6}')
+        && request.resource.data.keys().hasOnly(
+             ['name', 'ownerUid', 'memberUids', 'status', 'winnerOptionId', 'decidedAt', 'createdAt'])
+        && request.resource.data.keys().hasAll(['name', 'ownerUid', 'memberUids', 'status', 'createdAt'])
+        && isText(request.resource.data.name, 1, 40)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.memberUids == [request.auth.uid]
+        && request.resource.data.status == 'voting'
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if signedIn() && (
+        // A member records the decision.
+        (request.auth.uid in resource.data.memberUids
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'winnerOptionId', 'decidedAt'])
+          && request.resource.data.status in ['voting', 'decided']
+          && (!('winnerOptionId' in request.resource.data)
+              || request.resource.data.winnerOptionId == null
+              || request.resource.data.winnerOptionId is string)
+          && (!('decidedAt' in request.resource.data)
+              || request.resource.data.decidedAt == null
+              || request.resource.data.decidedAt is timestamp))
+        ||
+        // Someone with the invite code joins by adding only themselves.
+        (!(request.auth.uid in resource.data.memberUids)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberUids'])
+          && request.resource.data.memberUids == resource.data.memberUids.concat([request.auth.uid])
+          && resource.data.memberUids.size() < 20)
+      );
+
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      // groups/{gid}/options/{oid}: places the crew can vote on.
+      match /options/{oid} {
+        allow read: if isMember(gid);
+
+        allow create: if isMember(gid)
+          && request.resource.data.keys().hasOnly(
+               ['name', 'placeId', 'distanceMi', 'addedByUid', 'voteUids', 'createdAt'])
+          && request.resource.data.keys().hasAll(['name', 'addedByUid', 'voteUids', 'createdAt'])
+          && isText(request.resource.data.name, 1, 80)
+          && request.resource.data.addedByUid == request.auth.uid
+          && request.resource.data.voteUids.size() == 0
+          && (!('placeId' in request.resource.data) || request.resource.data.placeId is string)
+          && (!('distanceMi' in request.resource.data) || request.resource.data.distanceMi is number)
+          && request.resource.data.createdAt == request.time;
+
+        // Voting: only the voteUids list changes, and only by your own uid.
+        allow update: if isMember(gid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['voteUids'])
+          && votesChangeOnlyBySelf(resource.data.voteUids, request.resource.data.voteUids);
+
+        allow delete: if isMember(gid)
+          && (resource.data.addedByUid == request.auth.uid || isGroupOwner(gid));
+      }
+
+      // groups/{gid}/messages/{mid}: chat and posted picks. Create-only.
+      match /messages/{mid} {
+        allow read: if isMember(gid);
+
+        allow create: if isMember(gid)
+          && request.resource.data.keys().hasOnly(['senderUid', 'senderName', 'text', 'type', 'createdAt'])
+          && request.resource.data.keys().hasAll(['senderUid', 'senderName', 'text', 'type', 'createdAt'])
+          && request.resource.data.senderUid == request.auth.uid
+          && isText(request.resource.data.senderName, 1, 50)
+          && isText(request.resource.data.text, 1, 500)
+          && request.resource.data.type in ['user', 'pick']
+          && request.resource.data.createdAt == request.time;
+
+        allow update, delete: if false;
+      }
+    }
+  }
+}

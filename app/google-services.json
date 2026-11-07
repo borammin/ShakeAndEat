@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "750961700629",
+    "project_id": "shake-and-eat",
+    "storage_bucket": "shake-and-eat.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:750961700629:android:d2ef66e7e479f2c625031c",
+        "android_client_info": {
+          "package_name": "com.shakeandeat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBR_FABrmwipiTFSJtooJOQViJhhoJok04"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
