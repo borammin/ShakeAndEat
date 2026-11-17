@@ -22,7 +22,7 @@ class AuthRepository(
 ) {
     val currentUser: FirebaseUser? get() = auth.currentUser
 
-    /** Emits the signed-in user, or null, now and on every change. */
+    /** Emits the signed-in user, or null*/
     fun authState(): Flow<FirebaseUser?> = callbackFlow {
         val listener = FirebaseAuth.AuthStateListener { trySend(it.currentUser) }
         auth.addAuthStateListener(listener)
@@ -48,7 +48,6 @@ class AuthRepository(
 
     fun signOut() = auth.signOut()
 
-    /** Accounts made before the profile existed, or a failed first write, get one on next sign-in. */
     private suspend fun ensureProfile(user: FirebaseUser) = bestEffort("ensure profile") {
         val ref = db.collection(USERS).document(user.uid)
         if (!ref.get().await().exists()) {
@@ -67,7 +66,7 @@ class AuthRepository(
         ).await()
     }
 
-    /** Signing in must not fail just because the profile write did; log it and carry on. */
+    /** signing in must not fail just because the profile write did*/
     private suspend fun bestEffort(what: String, block: suspend () -> Unit) {
         try {
             block()

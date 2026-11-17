@@ -7,7 +7,7 @@ object AuthValidation {
 
     private val EMAIL = Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")
 
-    /** Firebase treats emails case-insensitively; we store and compare them lowercase. */
+    /** store and compare them lowercase */
     fun normalizeEmail(raw: String): String = raw.trim().lowercase()
 
     fun emailError(raw: String): String? =

@@ -10,6 +10,14 @@ Kotlin, Jetpack Compose, Firebase (Authentication and Cloud Firestore).
 2. Put your Firebase config at `app/google-services.json` (see the next section). The build fails without it.
 3. Run the `app` configuration on an emulator or a phone (Android 7.0 or newer).
 
+## Build an APK
+
+```
+.\gradlew assembleDebug
+```
+
+The APK is at `app/build/outputs/apk/debug/app-debug.apk`.
+
 ## Security rules
 
 `firestore.rules` holds the rules, and `firestore-tests/` tests them against the Firebase emulator (needs Node and Java):

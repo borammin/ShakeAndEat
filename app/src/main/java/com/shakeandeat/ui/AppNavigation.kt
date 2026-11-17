@@ -6,15 +6,19 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.shakeandeat.ui.groups.GroupsScreen
+import androidx.navigation.navArgument
+import com.shakeandeat.ui.groups.GroupDetailRoute
+import com.shakeandeat.ui.groups.GroupsRoute
 import com.shakeandeat.ui.login.LoginRoute
 
 object Routes {
     const val LOGIN = "login"
     const val GROUPS = "groups"
+    const val GROUP = "group/{gid}"
 }
 
 @Composable
@@ -27,8 +31,7 @@ fun AppNavigation(sessionViewModel: SessionViewModel = viewModel()) {
         if (sessionViewModel.user.value != null) Routes.GROUPS else Routes.LOGIN
     }
 
-    // Signing in moves to Groups and signing out returns to Login. Popping the old screen
-    // means Back from Groups exits the app instead of returning to Login.
+    // Signing in moves to Groups and signing out returns to Login. Popping the old screen exits the app
     LaunchedEffect(user) {
         val route = navController.currentDestination?.route ?: return@LaunchedEffect
         if (user == null && route != Routes.LOGIN) {
@@ -47,10 +50,17 @@ fun AppNavigation(sessionViewModel: SessionViewModel = viewModel()) {
             LoginRoute()
         }
         composable(Routes.GROUPS) {
-            GroupsScreen(
+            GroupsRoute(
                 email = user?.email,
+                onOpenGroup = { code -> navController.navigate("group/$code") },
                 onSignOut = sessionViewModel::signOut,
             )
+        }
+        composable(
+            route = Routes.GROUP,
+            arguments = listOf(navArgument("gid") { type = NavType.StringType }),
+        ) {
+            GroupDetailRoute(onBack = { navController.popBackStack() })
         }
     }
 }

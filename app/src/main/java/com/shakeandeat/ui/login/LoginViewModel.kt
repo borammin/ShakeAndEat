@@ -17,11 +17,6 @@ data class LoginUiState(
     val info: String? = null,
 )
 
-/**
- * Holds the request state, so a rotation mid-request neither loses the spinner nor repeats the call.
- * The typed text lives in the screen with rememberSaveable. On success nothing is emitted here:
- * the auth listener in SessionViewModel moves the app to the Groups screen.
- */
 class LoginViewModel(
     private val repository: AuthRepository = AuthRepository(),
 ) : ViewModel() {
