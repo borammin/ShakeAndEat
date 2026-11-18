@@ -15,6 +15,7 @@ data class Group(
     val memberUids: List<String>,
     val status: String,
     val winnerOptionId: String?,
+    val decidedAtMillis: Long? = null,
 ) {
     val isDecided: Boolean get() = status == GroupStatus.DECIDED
 }
@@ -26,6 +27,8 @@ data class PlaceOption(
     val addedByUid: String,
     val voteUids: List<String>,
     val createdAtMillis: Long,
+    val placeId: String? = null,
+    val distanceMi: Double? = null,
 ) {
     val votes: Int get() = voteUids.size
 }
@@ -42,6 +45,8 @@ fun DocumentSnapshot.toGroup(): Group? {
         memberUids = stringList("memberUids"),
         status = getString("status") ?: GroupStatus.VOTING,
         winnerOptionId = getString("winnerOptionId"),
+        decidedAtMillis = getTimestamp("decidedAt", DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
+            ?.toDate()?.time,
     )
 }
 
@@ -54,5 +59,7 @@ fun DocumentSnapshot.toPlaceOption(): PlaceOption? {
         voteUids = stringList("voteUids"),
         createdAtMillis = getTimestamp("createdAt", DocumentSnapshot.ServerTimestampBehavior.ESTIMATE)
             ?.toDate()?.time ?: 0L,
+        placeId = getString("placeId"),
+        distanceMi = getDouble("distanceMi"),
     )
 }

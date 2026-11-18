@@ -106,15 +106,22 @@ class GroupRepository(
         groups.document(code).update("memberUids", FieldValue.arrayUnion(uid)).await()
     }
 
-    suspend fun addOption(gid: String, name: String, uid: String) {
-        groups.document(gid).collection("options").document().set(
-            mapOf(
-                "name" to name,
-                "addedByUid" to uid,
-                "voteUids" to emptyList<String>(),
-                "createdAt" to FieldValue.serverTimestamp(),
-            ),
-        ).await()
+    suspend fun addOption(
+        gid: String,
+        name: String,
+        uid: String,
+        placeId: String? = null,
+        distanceMi: Double? = null,
+    ) {
+        val data = mutableMapOf<String, Any>(
+            "name" to name,
+            "addedByUid" to uid,
+            "voteUids" to emptyList<String>(),
+            "createdAt" to FieldValue.serverTimestamp(),
+        )
+        placeId?.let { data["placeId"] = it }
+        distanceMi?.let { data["distanceMi"] = it }
+        groups.document(gid).collection("options").document().set(data).await()
     }
 
     /** Adds or removes only the caller's own uid from the option's votes. */

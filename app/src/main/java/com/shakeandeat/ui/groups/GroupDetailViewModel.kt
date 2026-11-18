@@ -3,8 +3,10 @@ package com.shakeandeat.ui.groups
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.shakeandeat.data.ChatRepository
 import com.shakeandeat.data.Group
 import com.shakeandeat.data.GroupRepository
+import com.shakeandeat.data.NearbyPlace
 import com.shakeandeat.data.PlaceOption
 import com.shakeandeat.data.WinnerLogic
 import com.shakeandeat.data.toGroupMessage
@@ -23,6 +25,7 @@ data class GroupDetailUiState(
     val loaded: Boolean = false,
     val error: String? = null,
     val busy: Boolean = false,
+    val openPick: Boolean = false,
 ) {
     val winner: PlaceOption?
         get() = group?.winnerOptionId?.let { id -> options.firstOrNull { it.id == id } }
@@ -32,6 +35,7 @@ data class GroupDetailUiState(
 class GroupDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
 
     private val repository = GroupRepository()
+    private val chat = ChatRepository()
     private val gid: String = savedStateHandle.get<String>("gid").orEmpty()
 
     private val _state = MutableStateFlow(GroupDetailUiState(myUid = repository.currentUid))
@@ -60,6 +64,11 @@ class GroupDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         write { repository.addOption(gid, clean, me) }
     }
 
+    fun addPlace(place: NearbyPlace) {
+        val me = _state.value.myUid ?: return
+        write { repository.addOption(gid, place.name, me, place.placeId, place.distanceMi) }
+    }
+
     fun toggleVote(option: PlaceOption) {
         val me = _state.value.myUid ?: return
         if (_state.value.group?.isDecided == true) return
@@ -69,9 +78,22 @@ class GroupDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
 
     /** Picks the winner with [WinnerLogic] and saves it for everyone in the group. */
     fun pickWinner() {
-        val winner = WinnerLogic.pick(_state.value.options) ?: return fail("Add a place first.")
-        write { repository.decide(gid, winner.id) }
+        val options = _state.value.options
+        if (options.size < 2) return fail("Add at least 2 options")
+        val winner = WinnerLogic.pick(options) ?: return fail("Add at least 2 options")
+        write {
+            repository.decide(gid, winner.id)
+            try {
+                chat.postPick(gid, winner.name)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+            }
+            _state.update { it.copy(openPick = true) }
+        }
     }
+
+    fun onPickOpened() = _state.update { it.copy(openPick = false) }
 
     fun reopenVoting() = write { repository.reopenVoting(gid) }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -29,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,14 +51,24 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shakeandeat.data.Group
+import com.shakeandeat.data.NearbyPlace
 import com.shakeandeat.data.PlaceOption
+import com.shakeandeat.ui.places.NearbyPlacesSheet
 
 @Composable
 fun GroupDetailRoute(
     onBack: () -> Unit,
+    onOpenPick: () -> Unit = {},
+    onOpenChat: () -> Unit = {},
     viewModel: GroupDetailViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.openPick) {
+        if (state.openPick) {
+            onOpenPick()
+            viewModel.onPickOpened()
+        }
+    }
     GroupDetailScreen(
         state = state,
         onBack = onBack,
@@ -64,6 +77,9 @@ fun GroupDetailRoute(
         onPickWinner = viewModel::pickWinner,
         onReopen = viewModel::reopenVoting,
         onEdit = viewModel::clearError,
+        onAddPlace = viewModel::addPlace,
+        onOpenPick = onOpenPick,
+        onOpenChat = onOpenChat,
     )
 }
 
@@ -76,8 +92,12 @@ fun GroupDetailScreen(
     onPickWinner: () -> Unit,
     onReopen: () -> Unit,
     onEdit: () -> Unit,
+    onAddPlace: (NearbyPlace) -> Unit = {},
+    onOpenPick: () -> Unit = {},
+    onOpenChat: () -> Unit = {},
 ) {
     var newPlace by rememberSaveable { mutableStateOf("") }
+    var showNearby by rememberSaveable { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     val group = state.group
 
@@ -96,10 +116,19 @@ fun GroupDetailScreen(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            TextButton(
-                onClick = onBack,
-                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary),
-            ) { Text("‹ Back to groups") }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(
+                    onClick = onBack,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary),
+                ) { Text("‹ Back to groups") }
+                Spacer(Modifier.weight(1f))
+                if (group != null) {
+                    Button(
+                        onClick = onOpenChat,
+                        shape = RoundedCornerShape(50),
+                    ) { Text("Chat", fontWeight = FontWeight.Bold) }
+                }
+            }
 
             when {
                 !state.loaded -> Box(Modifier.fillMaxSize()) {
@@ -127,9 +156,19 @@ fun GroupDetailScreen(
                     onToggleVote = onToggleVote,
                     onPickWinner = onPickWinner,
                     onReopen = onReopen,
+                    onOpenPick = onOpenPick,
+                    onShowNearby = { showNearby = true },
                 )
             }
         }
+    }
+
+    if (showNearby && group != null) {
+        NearbyPlacesSheet(
+            existingPlaceIds = state.options.mapNotNull { it.placeId }.toSet(),
+            onAdd = onAddPlace,
+            onDismiss = { showNearby = false },
+        )
     }
 }
 
@@ -144,6 +183,8 @@ private fun ColumnScope.GroupBody(
     onToggleVote: (PlaceOption) -> Unit,
     onPickWinner: () -> Unit,
     onReopen: () -> Unit,
+    onOpenPick: () -> Unit,
+    onShowNearby: () -> Unit,
 ) {
     val context = LocalContext.current
     val members = if (group.memberUids.size == 1) "1 member" else "${group.memberUids.size} members"
@@ -195,7 +236,17 @@ private fun ColumnScope.GroupBody(
                         color = MaterialTheme.colorScheme.onPrimary,
                     )
                 }
-                OutlinedButton(onClick = onReopen, enabled = !state.busy) { Text("Reopen voting") }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = onOpenPick,
+                        enabled = state.winner != null,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondary,
+                            contentColor = MaterialTheme.colorScheme.onSecondary,
+                        ),
+                    ) { Text("See today's pick") }
+                    OutlinedButton(onClick = onReopen, enabled = !state.busy) { Text("Reopen voting") }
+                }
             }
         }
     }
@@ -238,6 +289,11 @@ private fun ColumnScope.GroupBody(
     }
 
     if (!group.isDecided) {
+        OutlinedButton(
+            onClick = onShowNearby,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.tertiary),
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("+ Add nearby place") }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -290,7 +346,8 @@ private fun OptionRow(
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = if (option.votes == 1) "1 vote" else "${option.votes} votes",
+                    text = (if (option.votes == 1) "1 vote" else "${option.votes} votes") +
+                        (option.distanceMi?.let { " · %.1f mi".format(it) } ?: ""),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

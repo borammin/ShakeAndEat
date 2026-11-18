@@ -12,13 +12,17 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.shakeandeat.ui.groups.GroupDetailRoute
+import com.shakeandeat.ui.chat.ChatRoute
 import com.shakeandeat.ui.groups.GroupsRoute
 import com.shakeandeat.ui.login.LoginRoute
+import com.shakeandeat.ui.pick.TodaysPickRoute
 
 object Routes {
     const val LOGIN = "login"
     const val GROUPS = "groups"
     const val GROUP = "group/{gid}"
+    const val PICK = "group/{gid}/pick"
+    const val CHAT = "group/{gid}/chat"
 }
 
 @Composable
@@ -59,8 +63,29 @@ fun AppNavigation(sessionViewModel: SessionViewModel = viewModel()) {
         composable(
             route = Routes.GROUP,
             arguments = listOf(navArgument("gid") { type = NavType.StringType }),
+        ) { entry ->
+            val gid = entry.arguments?.getString("gid").orEmpty()
+            GroupDetailRoute(
+                onBack = { navController.popBackStack() },
+                onOpenPick = { navController.navigate("group/$gid/pick") { launchSingleTop = true } },
+                onOpenChat = { navController.navigate("group/$gid/chat") { launchSingleTop = true } },
+            )
+        }
+        composable(
+            route = Routes.PICK,
+            arguments = listOf(navArgument("gid") { type = NavType.StringType }),
+        ) { entry ->
+            val gid = entry.arguments?.getString("gid").orEmpty()
+            TodaysPickRoute(
+                onBack = { navController.popBackStack() },
+                onOpenChat = { navController.navigate("group/$gid/chat") { launchSingleTop = true } },
+            )
+        }
+        composable(
+            route = Routes.CHAT,
+            arguments = listOf(navArgument("gid") { type = NavType.StringType }),
         ) {
-            GroupDetailRoute(onBack = { navController.popBackStack() })
+            ChatRoute(onBack = { navController.popBackStack() })
         }
     }
 }
