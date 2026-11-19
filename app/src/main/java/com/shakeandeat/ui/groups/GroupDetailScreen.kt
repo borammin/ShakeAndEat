@@ -56,6 +56,8 @@ import com.shakeandeat.data.Group
 import com.shakeandeat.data.NearbyPlace
 import com.shakeandeat.data.SearchResult
 import com.shakeandeat.data.PlaceOption
+import com.shakeandeat.sensors.ShakeEffect
+import com.shakeandeat.sensors.rememberShakeAvailable
 import com.shakeandeat.ui.places.NearbyPlacesSheet
 
 @Composable
@@ -357,6 +359,17 @@ private fun ColumnScope.GroupBody(
             enabled = state.options.isNotEmpty() && !state.busy,
             modifier = Modifier.fillMaxWidth().height(52.dp),
         ) { Text("Pick today's winner", fontWeight = FontWeight.Bold) }
+        // Shake is an extra: it runs the same action as the button above.
+        ShakeEffect(enabled = state.options.size >= 2 && !state.busy, onShake = onPickWinner)
+        if (rememberShakeAvailable()) {
+            Text(
+                "or shake your phone",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

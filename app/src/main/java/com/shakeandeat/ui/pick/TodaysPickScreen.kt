@@ -45,6 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shakeandeat.data.PlaceOption
+import com.shakeandeat.sensors.ShakeEffect
+import com.shakeandeat.sensors.rememberShakeAvailable
 import java.util.Date
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -227,8 +229,19 @@ private fun PickBody(
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
-                Text("Shake again", fontWeight = FontWeight.Bold)
+                Text("Pick again", fontWeight = FontWeight.Bold)
             }
+        }
+        // Shake is an extra: it runs the same action as the button above.
+        ShakeEffect(enabled = !state.busy, onShake = onShakeAgain)
+        if (rememberShakeAvailable()) {
+            Text(
+                "or shake again",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
         }
     }
 }
