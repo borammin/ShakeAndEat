@@ -20,6 +20,12 @@ interface PlacesApi {
         @Body body: NearbyRequest,
     ): NearbyResponse
 
+    @POST("v1/places:autocomplete")
+    suspend fun autocomplete(
+        @Header("X-Goog-Api-Key") apiKey: String,
+        @Body body: AutocompleteRequest,
+    ): AutocompleteResponse
+
     @GET("v1/places/{id}")
     suspend fun getPlace(
         @Path("id") placeId: String,
@@ -40,6 +46,30 @@ data class NearbyRequest(
 @Serializable data class Circle(val center: LatLngDto, val radius: Double)
 @Serializable data class LatLngDto(val latitude: Double, val longitude: Double)
 @Serializable data class NearbyResponse(val places: List<PlaceDto> = emptyList())
+
+@Serializable
+data class AutocompleteRequest(
+    val input: String,
+    val sessionToken: String,
+    val includedRegionCodes: List<String> = listOf("us"),
+)
+
+@Serializable data class AutocompleteResponse(val suggestions: List<Suggestion> = emptyList())
+@Serializable data class Suggestion(val placePrediction: PlacePrediction? = null)
+
+@Serializable
+data class PlacePrediction(
+    val placeId: String = "",
+    val text: LocalizedText? = null,
+    val structuredFormat: StructuredFormat? = null,
+    val types: List<String> = emptyList(),
+)
+
+@Serializable
+data class StructuredFormat(
+    val mainText: LocalizedText? = null,
+    val secondaryText: LocalizedText? = null,
+)
 
 @Serializable
 data class PlaceDto(

@@ -52,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shakeandeat.data.Group
 import com.shakeandeat.data.NearbyPlace
+import com.shakeandeat.data.SearchResult
 import com.shakeandeat.data.PlaceOption
 import com.shakeandeat.ui.places.NearbyPlacesSheet
 
@@ -78,6 +79,7 @@ fun GroupDetailRoute(
         onReopen = viewModel::reopenVoting,
         onEdit = viewModel::clearError,
         onAddPlace = viewModel::addPlace,
+        onAddSearchedPlace = viewModel::addSearchedPlace,
         onOpenPick = onOpenPick,
         onOpenChat = onOpenChat,
     )
@@ -93,6 +95,7 @@ fun GroupDetailScreen(
     onReopen: () -> Unit,
     onEdit: () -> Unit,
     onAddPlace: (NearbyPlace) -> Unit = {},
+    onAddSearchedPlace: (SearchResult) -> Unit = {},
     onOpenPick: () -> Unit = {},
     onOpenChat: () -> Unit = {},
 ) {
@@ -167,6 +170,7 @@ fun GroupDetailScreen(
         NearbyPlacesSheet(
             existingPlaceIds = state.options.mapNotNull { it.placeId }.toSet(),
             onAdd = onAddPlace,
+            onAddSearched = onAddSearchedPlace,
             onDismiss = { showNearby = false },
         )
     }
@@ -293,7 +297,7 @@ private fun ColumnScope.GroupBody(
             onClick = onShowNearby,
             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.tertiary),
             modifier = Modifier.fillMaxWidth(),
-        ) { Text("+ Add nearby place") }
+        ) { Text("+ Find a place") }
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

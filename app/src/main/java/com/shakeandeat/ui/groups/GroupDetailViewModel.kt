@@ -7,6 +7,7 @@ import com.shakeandeat.data.ChatRepository
 import com.shakeandeat.data.Group
 import com.shakeandeat.data.GroupRepository
 import com.shakeandeat.data.NearbyPlace
+import com.shakeandeat.data.SearchResult
 import com.shakeandeat.data.PlaceOption
 import com.shakeandeat.data.WinnerLogic
 import com.shakeandeat.data.toGroupMessage
@@ -67,6 +68,11 @@ class GroupDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     fun addPlace(place: NearbyPlace) {
         val me = _state.value.myUid ?: return
         write { repository.addOption(gid, place.name, me, place.placeId, place.distanceMi) }
+    }
+
+    fun addSearchedPlace(place: SearchResult) {
+        val me = _state.value.myUid ?: return
+        write { repository.addOption(gid, place.name, me, place.placeId, null) }
     }
 
     fun toggleVote(option: PlaceOption) {

@@ -20,6 +20,8 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shakeandeat.data.LOCATION_PERMISSIONS
 import com.shakeandeat.data.NearbyPlace
+import com.shakeandeat.data.SearchResult
 import com.shakeandeat.data.hasLocationPermission
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,10 +44,13 @@ import com.shakeandeat.data.hasLocationPermission
 fun NearbyPlacesSheet(
     existingPlaceIds: Set<String>,
     onAdd: (NearbyPlace) -> Unit,
+    onAddSearched: (SearchResult) -> Unit = {},
     onDismiss: () -> Unit,
     viewModel: NearbyPlacesViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val query by viewModel.query.collectAsStateWithLifecycle()
+    val search by viewModel.search.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
     val launcher = rememberLauncherForActivityResult(
@@ -74,9 +80,67 @@ fun NearbyPlacesSheet(
                 .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Nearby places", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Find a place", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-            when (val s = state) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = viewModel::onQueryChange,
+                label = { Text("Search for a restaurant or café") },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.tertiary,
+                    focusedLabelColor = MaterialTheme.colorScheme.tertiary,
+                    cursorColor = MaterialTheme.colorScheme.tertiary,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            if (query.trim().length >= 3) {
+                when (val r = search) {
+                    SearchState.Idle, SearchState.Loading -> Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) { CircularProgressIndicator() }
+
+                    is SearchState.Error -> Text(r.message, color = MaterialTheme.colorScheme.error)
+
+                    is SearchState.Results -> {
+                        val shown = r.places.filterNot { it.placeId in existingPlaceIds }
+                        if (shown.isEmpty()) {
+                            Text("No places found. Try a different name.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else {
+                            LazyColumn(modifier = Modifier.heightIn(max = 380.dp)) {
+                                items(shown, key = { it.placeId }) { place ->
+                                    ListItem(
+                                        headlineContent = { Text(place.name, fontWeight = FontWeight.Bold) },
+                                        supportingContent = if (place.address != null) {
+                                            { Text(place.address, maxLines = 1) }
+                                        } else {
+                                            null
+                                        },
+                                        trailingContent = {
+                                            TextButton(
+                                                onClick = {
+                                                    onAddSearched(place)
+                                                    viewModel.searchPicked()
+                                                },
+                                                colors = ButtonDefaults.textButtonColors(
+                                                    contentColor = MaterialTheme.colorScheme.tertiary,
+                                                ),
+                                            ) { Text("Add", fontWeight = FontWeight.Bold) }
+                                        },
+                                        colors = ListItemDefaults.colors(
+                                            containerColor = MaterialTheme.colorScheme.background,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } else when (val s = state) {
                 NearbyState.Idle, NearbyState.Loading -> Box(
                     modifier = Modifier
                         .fillMaxWidth()

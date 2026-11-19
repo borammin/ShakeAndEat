@@ -12,6 +12,13 @@ data class NearbyPlace(
     val distanceMi: Double,
 )
 
+/** One suggestion from the search box. No distance: searching doesn't need the phone's location. */
+data class SearchResult(
+    val placeId: String,
+    val name: String,
+    val address: String?,
+)
+
 data class PlaceHours(
     val openNow: Boolean?,
     val today: String?,
@@ -46,6 +53,32 @@ class PlacesRepository(
         }.sortedBy { it.distanceMi }
     }
 
+    /** Type-ahead search with Places Autocomplete. [sessionToken] groups one typing session. */
+    suspend fun search(query: String, sessionToken: String): List<SearchResult> {
+        check(apiKey.isNotBlank()) { "Missing PLACES_API_KEY" }
+        val response = api.autocomplete(
+            apiKey = apiKey,
+            body = AutocompleteRequest(input = query, sessionToken = sessionToken),
+        )
+        return response.suggestions.mapNotNull { suggestion ->
+            val p = suggestion.placePrediction ?: return@mapNotNull null
+            if (p.placeId.isBlank() || !p.looksLikeFoodPlace()) return@mapNotNull null
+            val name = p.structuredFormat?.mainText?.text?.takeIf { it.isNotBlank() }
+                ?: p.text?.text?.takeIf { it.isNotBlank() }
+                ?: return@mapNotNull null
+            SearchResult(
+                placeId = p.placeId,
+                name = name,
+                address = p.structuredFormat?.secondaryText?.text?.takeIf { it.isNotBlank() },
+            )
+        }
+    }
+
+    private fun PlacePrediction.looksLikeFoodPlace(): Boolean =
+        types.isEmpty() || types.any {
+            it == "food" || it.endsWith("restaurant") || it in FOOD_TYPES
+        }
+
     suspend fun hours(placeId: String): PlaceHours {
         check(apiKey.isNotBlank()) { "Missing PLACES_API_KEY" }
         val place = api.getPlace(placeId, apiKey, fieldMask = "id,currentOpeningHours")
@@ -64,5 +97,12 @@ class PlacesRepository(
         Location.distanceBetween(lat1, lng1, lat2, lng2, meters)
         val miles = meters[0] / 1609.34
         return (miles * 10).roundToInt() / 10.0
+    }
+
+    private companion object {
+        val FOOD_TYPES = setOf(
+            "cafe", "coffee_shop", "bakery", "bar", "meal_takeaway", "meal_delivery",
+            "ice_cream_shop", "sandwich_shop", "pizza_restaurant",
+        )
     }
 }
