@@ -124,6 +124,11 @@ class GroupRepository(
         groups.document(gid).collection("options").document().set(data).await()
     }
 
+    /** Deletes a place. The rules allow only the member who added it, or the group owner. */
+    suspend fun removeOption(gid: String, optionId: String) {
+        groups.document(gid).collection("options").document(optionId).delete().await()
+    }
+
     /** Adds or removes only the caller's own uid from the option's votes. */
     suspend fun setVote(gid: String, optionId: String, uid: String, voted: Boolean) {
         val change = if (voted) FieldValue.arrayUnion(uid) else FieldValue.arrayRemove(uid)

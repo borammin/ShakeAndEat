@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -43,6 +44,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -75,6 +77,7 @@ fun GroupDetailRoute(
         onBack = onBack,
         onAddOption = viewModel::addOption,
         onToggleVote = viewModel::toggleVote,
+        onRemoveOption = viewModel::removeOption,
         onPickWinner = viewModel::pickWinner,
         onReopen = viewModel::reopenVoting,
         onEdit = viewModel::clearError,
@@ -91,6 +94,7 @@ fun GroupDetailScreen(
     onBack: () -> Unit,
     onAddOption: (String) -> Unit,
     onToggleVote: (PlaceOption) -> Unit,
+    onRemoveOption: (PlaceOption) -> Unit = {},
     onPickWinner: () -> Unit,
     onReopen: () -> Unit,
     onEdit: () -> Unit,
@@ -101,6 +105,7 @@ fun GroupDetailScreen(
 ) {
     var newPlace by rememberSaveable { mutableStateOf("") }
     var showNearby by rememberSaveable { mutableStateOf(false) }
+    var pendingRemoveId by rememberSaveable { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
     val group = state.group
 
@@ -157,6 +162,7 @@ fun GroupDetailScreen(
                     },
                     fieldColors = fieldColors,
                     onToggleVote = onToggleVote,
+                    onAskRemove = { pendingRemoveId = it.id },
                     onPickWinner = onPickWinner,
                     onReopen = onReopen,
                     onOpenPick = onOpenPick,
@@ -164,6 +170,30 @@ fun GroupDetailScreen(
                 )
             }
         }
+    }
+
+    val pendingRemove = state.options.firstOrNull { it.id == pendingRemoveId }
+    if (pendingRemove != null) {
+        AlertDialog(
+            onDismissRequest = { pendingRemoveId = null },
+            title = { Text("Remove ${pendingRemove.name}?") },
+            text = { Text("It will disappear for everyone in the group, along with its votes.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onRemoveOption(pendingRemove)
+                        pendingRemoveId = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                ) { Text("Remove", fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingRemoveId = null },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.tertiary),
+                ) { Text("Cancel") }
+            },
+        )
     }
 
     if (showNearby && group != null) {
@@ -185,6 +215,7 @@ private fun ColumnScope.GroupBody(
     onAdd: () -> Unit,
     fieldColors: androidx.compose.material3.TextFieldColors,
     onToggleVote: (PlaceOption) -> Unit,
+    onAskRemove: (PlaceOption) -> Unit,
     onPickWinner: () -> Unit,
     onReopen: () -> Unit,
     onOpenPick: () -> Unit,
@@ -275,6 +306,9 @@ private fun ColumnScope.GroupBody(
                         isWinner = group.isDecided && option.id == group.winnerOptionId,
                         votingOpen = !group.isDecided,
                         onToggleVote = { onToggleVote(option) },
+                        canRemove = state.myUid != null &&
+                            (option.addedByUid == state.myUid || group.ownerUid == state.myUid),
+                        onRemove = { onAskRemove(option) },
                     )
                 }
             }
@@ -333,6 +367,8 @@ private fun OptionRow(
     isWinner: Boolean,
     votingOpen: Boolean,
     onToggleVote: () -> Unit,
+    canRemove: Boolean,
+    onRemove: () -> Unit,
 ) {
     Card(
         colors = CardDefaults.cardColors(
@@ -355,6 +391,13 @@ private fun OptionRow(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (votingOpen && canRemove) {
+                TextButton(
+                    onClick = onRemove,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurfaceVariant),
+                    modifier = Modifier.semantics { contentDescription = "Remove ${option.name}" },
+                ) { Text("✕") }
             }
             if (votingOpen) {
                 if (iVoted) {

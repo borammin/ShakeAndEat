@@ -75,6 +75,17 @@ class GroupDetailViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         write { repository.addOption(gid, place.name, me, place.placeId, null) }
     }
 
+    /** Removes a place. Only its adder or the group owner may, and only while voting is open. */
+    fun removeOption(option: PlaceOption) {
+        val me = _state.value.myUid ?: return
+        val group = _state.value.group ?: return
+        if (group.isDecided) return fail("Reopen voting to change the list.")
+        if (option.addedByUid != me && group.ownerUid != me) {
+            return fail("Only the person who added this place, or the group owner, can remove it.")
+        }
+        write { repository.removeOption(gid, option.id) }
+    }
+
     fun toggleVote(option: PlaceOption) {
         val me = _state.value.myUid ?: return
         if (_state.value.group?.isDecided == true) return
